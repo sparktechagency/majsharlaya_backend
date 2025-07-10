@@ -14,208 +14,168 @@ use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AuthController extends Controller
 {
-    // // user register
-    // public function register(Request $request)
-    // {
-    //     // create otp
-    //     $otp            = rand(100000, 999999);
-    //     $otp_expires_at = Carbon::now()->addMinutes(10);
+    // user register
+    public function register(Request $request)
+    {
 
-    //     // Send OTP Email
-    //     $email_otp = [
-    //         'userName' => explode('@', $request->email)[0],
-    //         'otp' => $otp,
-    //         'validity' => '10 minute'
-    //     ];
+        // create otp
+        $otp = rand(100000, 999999);
+        $otp_expires_at = Carbon::now()->addMinutes(10);
 
-    //     // rear case handle
-    //     $rearUser = User::where('email', $request->email)->first();
+        // Send OTP Email
+        $email_otp = [
+            'userName' => explode('@', $request->email)[0],
+            'otp' => $otp,
+            'validity' => '10 minute'
+        ];
 
-    //     if (($rearUser && $rearUser->verified_status == 'unverified')) {
+        // validation roles
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email',
+            'password' => 'required|string|min:6|confirmed',
+        ]);
 
-    //         // update otp and otp expires
-    //         $rearUser->otp = $otp;
-    //         $rearUser->otp_expires_at = $otp_expires_at;
-    //         $rearUser->save();
+        // check validation
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => $validator->errors()
+            ], 422);
+        }
 
-    //         try {
-    //             Mail::to($rearUser->email)->send(new VerifyOTPMail($email_otp));
-    //         } catch (Exception $e) {
-    //             Log::error($e->getMessage());
-    //         }
+        User::create([
+            'name' => ucfirst($request->name),
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+            'otp' => $otp,
+            'otp_expires_at' => $otp_expires_at,
+        ]);
 
-    //         // json response
-    //         return response()->json([
-    //             'status' => true,
-    //             'message' => 'Your account already exists, please verify your account, check you email for OTP'
-    //         ], 201);
-    //     }
+        // try {
+        //     Mail::to($user->email)->send(new VerifyOTPMail($email_otp));
+        // } catch (Exception $e) {
+        //     Log::error($e->getMessage());
+        // }
 
-    //     // validation roles
-    //     $validator = Validator::make($request->all(), [
-    //         'full_name'             => 'required|string|max:255',
-    //         'user_name'             => 'sometimes|max:255',
-    //         'email'                 => 'required|string|email|max:255|unique:users,email',
-    //         'password'              => 'required|string|min:6|confirmed',
-    //     ]);
+        // json response
+        return response()->json([
+            'status' => true,
+            'message' => 'Register successfully, OTP send you email, please verify your account'
+        ], 201);
+    }
 
-    //     // check validation
-    //     if ($validator->fails()) {
-    //         return response()->json([
-    //             'status' => false,
-    //             'message'   => $validator->errors()
-    //         ], 422);
-    //     }
+    // verify otp
+    public function verifyOtp(Request $request)
+    {
 
-    //     $user = User::create([
-    //         'name'           => ucfirst($request->full_name),
-    //         'user_name'      => $request->user_name ? '@' . ucfirst($request->user_name) . '_' . rand(0, 9) : '@' . explode(' ', trim($request->full_name))[0] . '_' . rand(0, 9),
-    //         'email'          => $request->email,
-    //         'password'       => Hash::make($request->password),
-    //         'otp'            => $otp,
-    //         'otp_expires_at' => $otp_expires_at,
-    //     ], 201);
+        $validator = Validator::make($request->all(), [
+            'otp' => 'required|numeric',
+        ]);
 
-    //     try {
-    //         Mail::to($user->email)->send(new VerifyOTPMail($email_otp));
-    //     } catch (Exception $e) {
-    //         Log::error($e->getMessage());
-    //     }
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => $validator->errors()
+            ], 422);
+        }
 
-    //     // json response
-    //     return response()->json([
-    //         'status' => true,
-    //         'message' => 'Register successfully, OTP send you email, please verify your account'
-    //     ], 201);
-    // }
+        $user = User::where('otp', $request->otp)->first();
 
-    // // verify otp
-    // public function verifyOtp(Request $request)
-    // {
+        if (!$user) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Invalid OTP'
+            ], 401);
+        }
 
-    //     $validator = Validator::make($request->all(), [
-    //         'otp' => 'required|numeric',
-    //     ]);
+        // check otp
+        if ($user->otp_expires_at > Carbon::now()) {
 
-    //     if ($validator->fails()) {
-    //         return response()->json([
-    //             'status' => false,
-    //             'message' => $validator->errors()
-    //         ], 422);
-    //     }
+            // user status update
+            $user->otp = null;
+            $user->otp_expires_at = null;
+            $user->otp_verified_at = Carbon::now();
+            $user->status = 'active';
+            $user->save();
 
-    //     $user = User::where('otp', $request->otp)->first();
+            // custom token time
+            $tokenExpiry = Carbon::now()->addDays(7);
+            $customClaims = ['exp' => $tokenExpiry->timestamp];
+            $token = JWTAuth::customClaims($customClaims)->fromUser($user);
 
-    //     if (!$user) {
-    //         return response()->json([
-    //             'status' => false,
-    //             'message'  => 'Invalid OTP'
-    //         ], 401);
-    //     }
+            // json response
+            return response()->json([
+                'status' => true,
+                'message' => 'Email verified successfully',
+                'access_token' => $token,
+                'token_type' => 'bearer',
+                'expires_in' => $tokenExpiry,
+                // 'expires_in' => $tokenExpiry->diffInSeconds(Carbon::now()),
+                // 'expires_in' => JWTAuth::factory()->getTTL() * 60,
+            ], 200);
+        } else {
 
-    //     // check otp
-    //     if ($user->otp_expires_at > Carbon::now()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'OTP expired time out'
+            ], 401);
+        }
+    }
 
-    //         // active
-    //         $user->last_login_at = Carbon::now();
-    //         $user->user_status   = 'active';
+    // resend otp
+    public function resendOtp(Request $request)
+    {
+        // validation roles
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+        ]);
 
-    //         // user status update
-    //         $user->otp                = null;
-    //         $user->otp_expires_at     = null;
-    //         $user->otp_verified_at    = Carbon::now();
-    //         $user->verified_status    = 'verified';
-    //         $user->save();
+        // check validation
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => $validator->errors()
+            ], 422);
+        }
 
-    //         // custom token time
-    //         $tokenExpiry = Carbon::now()->addDays(7);
-    //         $customClaims = ['exp' => $tokenExpiry->timestamp];
-    //         $token = JWTAuth::customClaims($customClaims)->fromUser($user);
+        // Check if User Exists
+        $user = User::where('email', $request->email)->first();
 
-    //         // Generate JWT Token
-    //         // $token = JWTAuth::fromUser($user);
+        if (!$user) {
+            return response()->json([
+                'status' => false,
+                'message' => 'User not found'
+            ], 404);
+        }
 
-    //         // json response
-    //         return response()->json([
-    //             'status'  => true,
-    //             'message' => 'Email verified successfully',
-    //             'access_token' => $token,
-    //             'token_type' => 'bearer',
-    //             'expires_in' => $tokenExpiry,
-    //             // 'expires_in' => $tokenExpiry->diffInSeconds(Carbon::now()),
-    //             // 'expires_in' => JWTAuth::factory()->getTTL() * 60,
-    //         ], 200);
-    //     } else {
+        $otp = rand(100000, 999999);
+        $otp_expires_at = Carbon::now()->addMinutes(10);
 
-    //         return response()->json([
-    //             'status' => false,
-    //             'message'  => 'OTP expired time out'
-    //         ], 401);
-    //     }
-    // }
+        // update otp and otp expired at
+        $user->otp = $otp;
+        $user->otp_expires_at = $otp_expires_at;
+        $user->otp_verified_at = null;
+        $user->save();
 
-    // // resend otp
-    // public function resendOtp(Request $request)
-    // {
-    //     // validation roles
-    //     $validator = Validator::make($request->all(), [
-    //         'email'                 => 'required|string|email',
-    //     ]);
+        // Send OTP Email
+        $data = [
+            'userName' => explode('@', $request->email)[0],
+            'otp' => $otp,
+            'validity' => '10 minute'
+        ];
 
-    //     // check validation
-    //     if ($validator->fails()) {
-    //         return response()->json([
-    //             'status' => false,
-    //             'message'   => $validator->errors()
-    //         ], 422);
-    //     }
+        // try {
+        //     Mail::to($user->email)->send(new VerifyOTPMail($data));
+        // } catch (Exception $e) {
+        //     Log::error($e->getMessage());
+        // }
 
-    //     // Check if User Exists
-    //     $user = User::where('email', $request->email)->first();
-
-    //     if (!$user) {
-    //         return response()->json([
-    //             'status' => false,
-    //             'message' => 'User not found'
-    //         ], 404);
-    //     }
-
-    //     $otp            = rand(100000, 999999);
-    //     $otp_expires_at = Carbon::now()->addMinutes(10);
-
-    //     // email user check
-    //     if ($user->verified_status == 'unverified') {
-
-    //         // update otp and otp expired at
-    //         $user->otp = $otp;
-    //         $user->otp_expires_at = $otp_expires_at;
-    //         $user->otp_verified_at = null;
-    //         $user->save();
-    //     } else {
-    //         return response()->json([
-    //             'status'  => false,
-    //             'message' => 'User already verified.'
-    //         ], 200);
-    //     }
-
-    //     // Send OTP Email
-    //     $data = [
-    //         'userName' => explode('@', $request->email)[0],
-    //         'otp' => $otp,
-    //         'validity' => '10 minute'
-    //     ];
-
-    //     try {
-    //         Mail::to($user->email)->send(new VerifyOTPMail($data));
-    //     } catch (Exception $e) {
-    //         Log::error($e->getMessage());
-    //     }
-
-    //     return response()->json([
-    //         'status'  => true,
-    //         'message' => 'OTP resend to your email'
-    //     ], 200);
-    // }
+        return response()->json([
+            'status' => true,
+            'message' => 'OTP resend to your email'
+        ], 200);
+    }
 
     // user login
     public function login(Request $request)
@@ -246,15 +206,15 @@ class AuthController extends Controller
             ], 404);
         }
 
-        // Check Account Status
-        if ($user->status != 'active') {
+        // Check account status
+        if ($user->status !== 'active') {
             return response()->json([
                 'status' => false,
                 'message' => 'Your account is inactive. Please contact support.',
             ], 403);
         }
 
-        // Verify Password
+        // Verify password
         if (!Hash::check($request->password, $user->password)) {
             return response()->json([
                 'status' => false,
@@ -266,9 +226,6 @@ class AuthController extends Controller
         $tokenExpiry = $request->remember_me == '1' ? Carbon::now()->addDays(30) : Carbon::now()->addDays(7);
         $customClaims = ['exp' => $tokenExpiry->timestamp];
         $token = JWTAuth::customClaims($customClaims)->fromUser($user);
-
-        // Generate JWT Token
-        // $token = JWTAuth::fromUser($user);
 
         // Return Success Response
         return response()->json([
@@ -299,112 +256,102 @@ class AuthController extends Controller
         }
     }
 
-    // // forgot password
-    // public function forgotPassword(Request $request)
-    // {
-    //     // Validation Rules
-    //     $validator = Validator::make($request->all(), [
-    //         'email' => 'required|email|max:255',
-    //     ]);
+    // forgot password
+    public function forgotPassword(Request $request)
+    {
+        // Validation Rules
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email|max:255',
+        ]);
 
-    //     // Return Validation Errors
-    //     if ($validator->fails()) {
-    //         return response()->json([
-    //             'status' => false,
-    //             'message' => $validator->errors(),
-    //         ], 422);
-    //     }
+        // Return Validation Errors
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => $validator->errors(),
+            ], 422);
+        }
 
-    //     // Check if User Exists
-    //     $user = User::where('email', $request->email)->first();
+        // Check if User Exists
+        $user = User::where('email', $request->email)->first();
 
-    //     // User Not Found
-    //     if (!$user) {
-    //         return response()->json([
-    //             'status' => false,
-    //             'message' => 'User not found',
-    //         ], 404);
-    //     }
+        // User Not Found
+        if (!$user) {
+            return response()->json([
+                'status' => false,
+                'message' => 'User not found',
+            ], 404);
+        }
 
-    //     // create otp
-    //     $otp = rand(100000, 999999);
-    //     $otp_expires_at = Carbon::now()->addMinutes(10);
+        // create otp
+        $otp = rand(100000, 999999);
+        $otp_expires_at = Carbon::now()->addMinutes(10);
 
-    //     if ($user->verified_status == 'verified') {
+        // update otp and otp veridied and otp expired at
+        $user->otp_verified_at = null;
+        $user->otp = $otp;
+        $user->otp_expires_at = $otp_expires_at;
+        $user->save();
 
-    //         // update otp and otp veridied and otp expired at
-    //         $user->otp_verified_at = null;
-    //         $user->otp             = $otp;
-    //         $user->otp_expires_at  = $otp_expires_at;
-    //         $user->verified_status          = 'unverified';
-    //         $user->save();
-    //     } else {
-    //         return response()->json([
-    //             'status' => false,
-    //             'message' => 'User not verified',
-    //         ], 404);
-    //     }
+        $data = [
+            'userName' => explode('@', $request->email)[0],
+            'otp' => $otp,
+            'validity' => '10 minutes'
+        ];
 
-    //     $data = [
-    //         'userName' => explode('@', $request->email)[0],
-    //         'otp' => $otp,
-    //         'validity' => '10 minutes'
-    //     ];
+        // try {
+        //     Mail::to($request->email)->send(new VerifyOTPMail($data));
+        // } catch (Exception $e) {
+        //     Log::error($e->getMessage());
+        // }
 
-    //     try {
-    //         Mail::to($request->email)->send(new VerifyOTPMail($data));
-    //     } catch (Exception $e) {
-    //         Log::error($e->getMessage());
-    //     }
+        return response()->json([
+            'status' => true,
+            'message' => 'OTP send to your email'
+        ], 200);
+    }
 
-    //     return response()->json([
-    //         'status'  => true,
-    //         'message' => 'OTP send to your email'
-    //     ], 200);
-    // }
+    // after forgot password then change password
+    public function changePassword(Request $request)
+    {
+        // Validation Rules
+        $validator = Validator::make($request->all(), [
+            'password' => 'required|string|min:6|confirmed'
+        ]);
 
-    // // after forgot password then change password
-    // public function changePassword(Request $request)
-    // {
+        // Return Validation Errors
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => $validator->errors(),
+            ], 422);
+        }
 
-    //     // Validation Rules
-    //     $validator = Validator::make($request->all(), [
-    //         'password' => 'required|string|min:6|confirmed'
-    //     ]);
+        // Check if User Exists
+        $user = User::where('id', Auth::id())->first();
 
-    //     // Return Validation Errors
-    //     if ($validator->fails()) {
-    //         return response()->json([
-    //             'status' => false,
-    //             'message' => $validator->errors(),
-    //         ], 422);
-    //     }
+        // User Not Found
+        if (!$user) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Unauthenticated',
+            ], 404);
+        }
 
-    //     // Check if User Exists
-    //     $user = User::where('email', Auth::user()->email)->first();
-
-    //     // User Not Found
-    //     if (!$user) {
-    //         return response()->json([
-    //             'status' => false,
-    //             'message' => 'Unauthenticated',
-    //         ], 404);
-    //     };
-
-    //     if ($user->verified_status == 'verified') {
-    //         $user->password = Hash::make($request->password);
-    //         $user->save();
-    //         return response()->json([
-    //             'status' => true,
-    //             'message' => 'Password change successfully!',
-    //         ]);
-    //     } else {
-    //         return response()->json([
-    //             'status' => false,
-    //             'message' => 'User not verified'
-    //         ]);
-    //     }
-    // }
+        if ($user->status == 'active') {
+            $user->password = Hash::make($request->password);
+            $user->save();
+            return response()->json([
+                'status' => true,
+                'message' => 'Password change successfully!',
+            ]);
+        } else {
+            return response()->json([
+                'status' => false,
+                'message' => 'Unauthorized user'
+            ]);
+        }
+    }
 
     // user profile by id
     public function profile()
@@ -417,6 +364,8 @@ class AuthController extends Controller
             ], 404);
         }
 
+        $user->avatar = $user->avatar!=null?$user->avatar:'https://ui-avatars.com/api/?background=random&name='.$user->name;
+
         return response()->json([
             'status' => true,
             'message' => 'Your profile',
@@ -424,45 +373,45 @@ class AuthController extends Controller
         ], 200);
     }
 
-    // // user update your account password
-    // public function updatePassword(Request $request)
-    // {
-    //     $validator = Validator::make($request->all(), [
-    //         'current_password' => 'required|min:6',
-    //         'password'         => 'required|string|min:6|confirmed'
-    //     ]);
+    // user update your account password
+    public function updatePassword(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'current_password' => 'required|min:6',
+            'password'         => 'required|string|min:6|confirmed'
+        ]);
 
-    //     if ($validator->fails()) {
-    //         return response()->json([
-    //             'status' => false,
-    //             'message' => $validator->errors()
-    //         ], 422);
-    //     }
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => $validator->errors()
+            ], 422);
+        }
 
-    //     $user = User::find(Auth::id());
+        $user = User::find(Auth::id());
 
-    //     if (! $user) {
-    //         return response()->json([
-    //             'status' => false,
-    //             'message' => 'User not found'
-    //         ], 404);
-    //     }
+        if (! $user) {
+            return response()->json([
+                'status' => false,
+                'message' => 'User not found'
+            ], 404);
+        }
 
-    //     if (Hash::check($request->current_password, $user->password)) {
-    //         $user->password = Hash::make($request->password);
-    //         $user->save();
+        if (Hash::check($request->current_password, $user->password)) {
+            $user->password = Hash::make($request->password);
+            $user->save();
 
-    //         return response()->json([
-    //             'status' => true,
-    //             'message' => 'Password updated successfully!',
-    //         ]);
-    //     } else {
-    //         return response()->json([
-    //             'status' => false,
-    //             'message' => 'Invalid current password!',
-    //         ]);
-    //     }
-    // }
+            return response()->json([
+                'status' => true,
+                'message' => 'Password updated successfully!',
+            ]);
+        } else {
+            return response()->json([
+                'status' => false,
+                'message' => 'Invalid current password!',
+            ]);
+        }
+    }
 
     // // upload avatar
     // public function avatar(Request $request)

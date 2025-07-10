@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ProviderCompany;
+use App\Models\Review;
 use App\Models\Service;
 use App\Models\ServiceList;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -40,13 +42,14 @@ class ProviderCompanyController extends Controller
 
 
         $provider_company = User::create([
-            'name' => 'unknown',
+            'name' => 'Unknown',
             'role' => 'COMPANY',
             'status' => 'active',
-            'types' => $request->provider_types,
+            // 'types' => $request->provider_types,
             'city' => $request->city,
             'state' => $request->state,
             'email' => $request->email,
+            'email_verified_at' => Carbon::now(),
             'password' => bcrypt($request->password)
         ]);
 
@@ -67,7 +70,7 @@ class ProviderCompanyController extends Controller
 
     public function getProviderCompanies(Request $request)
     {
-        $users = User::where('role', 'COMPANY')->get();
+        $users = User::where('id',$request->provider_company_id)->where('role', 'COMPANY')->get();
 
 
         // প্রতিটি user এর সাথে তার service_lists যুক্ত করা
@@ -76,6 +79,10 @@ class ProviderCompanyController extends Controller
             // $user->service_list_names = $user->serviceLists->pluck('service_name'); auto lazy load
             $user->service_list_names = ServiceList::where('user_id', $user->id)->pluck('service_name');
             $user->plus_counts = ServiceList::where('user_id', $user->id)->pluck('service_name')->count() - 1;
+
+            // ✅ Reviews থেকে avg rating এবং total count
+            $user->avgRating = Review::where('provider_company_id', $user->id)->avg('rating');
+            $user->totalReviews = Review::where('provider_company_id', $user->id)->count();
 
             return $user;
         });
@@ -154,8 +161,7 @@ class ProviderCompanyController extends Controller
             'provider_company_id' => 'required|numeric',
         ]);
 
-        $user = User::with('serviceLists') // relationship load
-            ->where('id', $request->provider_company_id)
+        $user = User::where('id', $request->provider_company_id)
             ->where('role', 'COMPANY')
             ->first();
 
@@ -169,8 +175,14 @@ class ProviderCompanyController extends Controller
         // Optional: types remove if exists
         unset($user->types);
 
+
         // Optional: service name list
-        $user->service_list_names = $user->serviceLists->pluck('service_name');
+        // $user->service_list_names = $user->serviceLists->pluck('service_name');
+        $user->service_list_names = ServiceList::where('user_id', $user->id)->pluck('service_name');
+
+        // ✅ Reviews থেকে avg rating এবং total count
+        $user->avgRating = Review::where('provider_company_id', $user->id)->avg('rating');
+        $user->totalReviews = Review::where('provider_company_id', $user->id)->count();
 
         return response()->json([
             'status' => true,

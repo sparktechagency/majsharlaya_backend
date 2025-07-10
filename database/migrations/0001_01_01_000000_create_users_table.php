@@ -5,8 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use phpDocumentor\Reflection\Types\Nullable;
 
-return new class extends Migration
-{
+return new class extends Migration {
     /**
      * Run the migrations.
      */
@@ -23,16 +22,14 @@ return new class extends Migration
             $table->string('address')->nullable();
             $table->timestamp('otp_verified_at')->nullable();
             $table->string('otp')->nullable();
-            $table->timestamp('otp_expired_at')->nullable();
+            $table->timestamp('otp_expires_at')->nullable();
             $table->string('phone_number')->nullable();
-            $table->string('avatar')->nullable();
-            
-            $table->json('types')->nullable();
+            $table->string('avatar')->default('/default/avatar.jpg');
             $table->string('city')->nullable();
             $table->string('state')->nullable();
-            $table->unsignedInteger('rating')->nullable();
             $table->longText('about')->nullable();
             $table->json('overview')->nullable();
+            $table->json('photo')->nullable();
 
             $table->rememberToken();
             $table->timestamps();

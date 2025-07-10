@@ -47,7 +47,7 @@ class ServiceController extends Controller
         // Validation Rules
         $validator = Validator::make($request->all(), [
             'service_id' => 'required|numeric',
-            'page' => 'required|numeric',
+            'page'       => 'required|numeric|unique:service_pages,page',
             'type' => 'required|string',
             'name' => 'required|string',
             'image' => 'sometimes|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
@@ -88,7 +88,7 @@ class ServiceController extends Controller
     {
         // Validation Rules
         $validator = Validator::make($request->all(), [
-            'service_page_id' => 'required|numeric',
+            'page_id' => 'required|numeric',
             'name' => 'required|string',
             'type' => 'required|string',
             'price' => 'sometimes|string',
@@ -105,7 +105,7 @@ class ServiceController extends Controller
         $service_page_field = ServicePageField::create([
 
 
-            'service_page_id' => $request->service_page_id,
+            'service_page_id' => $request->page_id,
             'name' => $request->name,
             'type' => $request->type,
             'price' => $request->price
@@ -123,7 +123,7 @@ class ServiceController extends Controller
         // Validation Rules
         $validator = Validator::make($request->all(), [
             // 'service_id' => 'required|numeric',
-            'service_page_id' => 'required|numeric',
+            'page_id' => 'required|numeric',
             'button_text' => 'required|string',
             'action' => 'required|string',
         ]);
@@ -136,11 +136,10 @@ class ServiceController extends Controller
             ], 422);
         }
 
-
         $service_page_button = ServicePageButton::create([
             // 'user_id' => Auth::id(),
             // 'service_id' => $request->service_id,
-            'service_page_id' => $request->service_page_id,
+            'service_page_id' => $request->page_id,
             'button_text' => $request->button_text,
             'action' => $request->action
         ]);
@@ -152,13 +151,11 @@ class ServiceController extends Controller
         ], 201);
     }
 
-    public function buttonAction(Request $request)
+    public function buttonActionModal(Request $request)
     {
         // Validation Rules
         $validator = Validator::make($request->all(), [
-            // 'service_id' => 'required|numeric',
-            // 'service_page_id' => 'required|numeric',
-            'service_page_button_id' => 'required|numeric',
+            'button_id' => 'required|numeric',
             'modal_name' => 'required|string',
             'fields' => 'required',
         ]);
@@ -171,13 +168,8 @@ class ServiceController extends Controller
             ], 422);
         }
 
-
-
         $service_page_button_modal = ServicePageButtonModal::create([
-            // 'user_id' => Auth::id(),
-            // 'service_id' => $request->service_id,
-            // 'service_page_id' => $request->service_page_id,
-            'service_page_button_id' => $request->service_page_button_id,
+            'service_page_button_id' => $request->button_id,
             'modal_name' => $request->modal_name,
             'fields' => $request->fields
         ]);
@@ -194,7 +186,7 @@ class ServiceController extends Controller
         // Validation Rules
         $validator = Validator::make($request->all(), [
             // 'service_id' => 'required|numeric',
-            'service_page_id' => 'required|numeric',
+            'page_id' => 'required|numeric',
             'select_area_name' => 'required|string',
         ]);
 
@@ -206,12 +198,8 @@ class ServiceController extends Controller
             ], 422);
         }
 
-
-
         $service_page_selection = ServicePageSelection::create([
-            // 'user_id' => Auth::id(),
-            // 'service_id' => $request->service_id,
-            'service_page_id' => $request->service_page_id,
+            'service_page_id' => $request->page_id,
             'select_area_name' => $request->select_area_name,
         ]);
 
@@ -228,7 +216,7 @@ class ServiceController extends Controller
         $validator = Validator::make($request->all(), [
             // 'service_id' => 'required|numeric',
             // 'service_page_id' => 'required|numeric',
-            'service_page_selection_id' => 'required|numeric',
+            'selection_id' => 'required|numeric',
             'selection_text' => 'required|string',
             'type' => 'required|string',
             'price' => 'required|string',
@@ -242,14 +230,8 @@ class ServiceController extends Controller
             ], 422);
         }
 
-
-
-
         $service_page_selection_item = ServicePageSelectionItem::create([
-            // 'user_id' => Auth::id(),
-            // 'service_id' => $request->service_id,
-            // 'service_page_id' => $request->service_page_id,
-            'service_page_selection_id' => $request->service_page_selection_id,
+            'service_page_selection_id' => $request->selection_id,
             'selection_text' => $request->selection_text,
             'type' => $request->type,
             'price' => $request->price,

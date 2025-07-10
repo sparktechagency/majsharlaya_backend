@@ -64,9 +64,23 @@ class User extends Authenticatable implements JWTSubject
         return []; // কাস্টম ক্লেইম লাগলে এখানে দাও
     }
 
-
     public function serviceLists()
     {
         return $this->hasMany(ServiceList::class);
     }
+
+    public function getOverviewAttribute($value)
+    {
+        return $value ? json_decode($value, true) : [];
+    }
+
+    public function getPhotoAttribute($value)
+    {
+        return $value ? json_decode($value, true) : [];
+    }
+
+    // In User.php
+    // protected $casts = [
+    //     'photo' => 'array',
+    // ];
 }

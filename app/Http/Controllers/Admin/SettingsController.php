@@ -39,7 +39,7 @@ class SettingsController extends Controller
         ], 201);
     }
 
-    public function changePassword(Request $request)
+    public function updatePassword(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'current_password' => 'required|min:6',
@@ -78,6 +78,7 @@ class SettingsController extends Controller
         }
     }
 
+    
     public function changeAvatar(Request $request)
     {
          $user = User::where('id',Auth::id())->where('role','ADMIN')->first();
