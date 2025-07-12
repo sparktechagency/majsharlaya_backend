@@ -40,17 +40,16 @@ class ProviderCompanyController extends Controller
             ? json_decode($request->provider_types, true)
             : $request->provider_types;
 
-
         $provider_company = User::create([
             'name' => 'Unknown',
             'role' => 'COMPANY',
             'status' => 'active',
-            // 'types' => $request->provider_types,
             'city' => $request->city,
             'state' => $request->state,
             'email' => $request->email,
             'email_verified_at' => Carbon::now(),
-            'password' => bcrypt($request->password)
+            'password' => bcrypt($request->password),
+            'company_type' => $request->provider_types
         ]);
 
         foreach ($providerTypes as $value) {
@@ -59,7 +58,6 @@ class ProviderCompanyController extends Controller
                 'service_name' => $value,
             ]);
         }
-
 
         return response()->json([
             'status' => true,
@@ -70,18 +68,29 @@ class ProviderCompanyController extends Controller
 
     public function getProviderCompanies(Request $request)
     {
-        $users = User::where('id',$request->provider_company_id)->where('role', 'COMPANY')->get();
+        $search = $request->input('search'); // ?search=dhaka, etc
 
+        $usersQuery = User::where('role', 'COMPANY');
 
-        // প্রতিটি user এর সাথে তার service_lists যুক্ত করা
+        if ($search) {
+            $usersQuery->where(function ($query) use ($search) {
+                $query->where('name', 'like', "%$search%");
+                // ->orWhere('email', 'like', "%$search%")
+                // ->orWhere('city', 'like', "%$search%")
+                // ->orWhere('state', 'like', "%$search%");
+            });
+        }
+
+        $users = $usersQuery->paginate(10);
+
         $users->map(function ($user) {
             unset($user->types);
-            // $user->service_list_names = $user->serviceLists->pluck('service_name'); auto lazy load
-            $user->service_list_names = ServiceList::where('user_id', $user->id)->pluck('service_name');
-            $user->plus_counts = ServiceList::where('user_id', $user->id)->pluck('service_name')->count() - 1;
 
-            // ✅ Reviews থেকে avg rating এবং total count
-            $user->avgRating = Review::where('provider_company_id', $user->id)->avg('rating');
+            $user->service_list_names = ServiceList::where('user_id', $user->id)->pluck('service_name');
+            $user->plus_counts = $user->service_list_names->count() - 1;
+
+            // ✅ avg rating and total count from reviews
+            $user->avgRating = round(Review::where('provider_company_id', $user->id)->avg('rating'), 1);
             $user->totalReviews = Review::where('provider_company_id', $user->id)->count();
 
             return $user;
@@ -89,14 +98,42 @@ class ProviderCompanyController extends Controller
 
         return response()->json([
             'status' => true,
-            'message' => 'Get all provider companies',
+            'message' => $search ? "Searching by company name" : "Get all provider companies",
             'data' => $users
         ], 200);
     }
 
+    public function filterProviderCompanies(Request $request)
+    {
+        $inputType = $request->input('type'); // example: 'plamber'
+
+        if (!$inputType) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Type field is required'
+            ], 422);
+        }
+
+        $companies = User::where('role', 'COMPANY')->get();
+
+        $matched = $companies->filter(function ($company) use ($inputType) {
+            $types = json_decode($company->company_type, true);
+
+            if (!is_array($types))
+                return false;
+
+            return in_array($inputType, $types);
+        })->values();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Filter by ' . $inputType,
+            'data' => $matched
+        ]);
+    }
+
     public function deleteProviderCompany(Request $request)
     {
-        // User খুঁজে বের করো যেটা কোম্পানি এবং ওই ID এর
         $company = User::where('id', $request->provider_company_id)->where('role', 'COMPANY')->first();
 
         if (!$company) {
@@ -106,7 +143,6 @@ class ProviderCompanyController extends Controller
             ], 404);
         }
 
-        // ডিলিট করো
         $company->delete();
 
         return response()->json([
@@ -117,14 +153,12 @@ class ProviderCompanyController extends Controller
 
     public function changePasswordProviderCompany(Request $request)
     {
-        // ✅ Step 1: Validate input
         $request->validate([
             'provider_company_id' => 'required|exists:users,id',
             'current_password' => 'required|string',
             'new_password' => 'required|string|min:6|confirmed', // new_password_confirmation লাগবে
         ]);
 
-        // ✅ Step 2: ইউজার খোঁজো এবং কোম্পানি কিনা চেক করো
         $user = User::where('id', $request->provider_company_id)
             ->where('role', 'COMPANY')
             ->first();
@@ -136,7 +170,6 @@ class ProviderCompanyController extends Controller
             ], 404);
         }
 
-        // ✅ Step 3: পুরনো পাসওয়ার্ড যাচাই করো
         if (!Hash::check($request->current_password, $user->password)) {
             return response()->json([
                 'status' => false,
@@ -144,7 +177,6 @@ class ProviderCompanyController extends Controller
             ], 401);
         }
 
-        // ✅ Step 4: নতুন পাসওয়ার্ড সেট করো
         $user->password = Hash::make($request->new_password);
         $user->save();
 
@@ -157,7 +189,6 @@ class ProviderCompanyController extends Controller
     public function viewProviderCompany(Request $request)
     {
         $request->validate([
-            // 'provider_company_id' => 'required|exists:users,id',
             'provider_company_id' => 'required|numeric',
         ]);
 
@@ -180,7 +211,7 @@ class ProviderCompanyController extends Controller
         // $user->service_list_names = $user->serviceLists->pluck('service_name');
         $user->service_list_names = ServiceList::where('user_id', $user->id)->pluck('service_name');
 
-        // ✅ Reviews থেকে avg rating এবং total count
+        // avg rating and total count form reviews
         $user->avgRating = Review::where('provider_company_id', $user->id)->avg('rating');
         $user->totalReviews = Review::where('provider_company_id', $user->id)->count();
 
@@ -189,5 +220,49 @@ class ProviderCompanyController extends Controller
             'message' => 'Provider company profile',
             'data' => $user
         ]);
+    }
+
+    public function searchFilterProviderCompanies(Request $request)
+    {
+        $search = $request->input('search');    // for name search
+        $type = $request->input('type');        // for filtering company_type
+
+        $usersQuery = User::where('role', 'COMPANY');
+
+        // 🔍 Search by name/email/city/state
+        if ($search) {
+            $usersQuery->where(function ($query) use ($search) {
+                $query->where('name', 'like', "%$search%")
+                    ->orWhere('email', 'like', "%$search%")
+                    ->orWhere('city', 'like', "%$search%")
+                    ->orWhere('state', 'like', "%$search%");
+            });
+        }
+
+        $users = $usersQuery->get();
+
+        // 🔎 Filter by type (like plamber, cutting)
+        if ($type) {
+            $users = $users->filter(function ($user) use ($type) {
+                $types = json_decode($user->company_type, true);
+                return is_array($types) && in_array($type, $types);
+            })->values();
+        }
+
+        // 🛠️ Enhance data
+        $users->map(function ($user) {
+            unset($user->types);
+            $user->service_list_names = ServiceList::where('user_id', $user->id)->pluck('service_name');
+            $user->plus_counts = $user->service_list_names->count() - 1;
+            $user->avgRating = round(Review::where('provider_company_id', $user->id)->avg('rating'), 1);
+            $user->totalReviews = Review::where('provider_company_id', $user->id)->count();
+            return $user;
+        });
+
+        return response()->json([
+            'status' => true,
+            'message' => $search || $type ? ($search && $type ? 'Filtered Companies' : ($search ? 'Searched Companies' : 'Filtered Companies')) : 'All Companies',
+            'data' => $users
+        ], 200);
     }
 }

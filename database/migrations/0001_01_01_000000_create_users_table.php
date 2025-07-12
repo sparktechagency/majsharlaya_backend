@@ -30,6 +30,7 @@ return new class extends Migration {
             $table->longText('about')->nullable();
             $table->json('overview')->nullable();
             $table->json('photo')->nullable();
+            $table->json('company_type')->nullable();
 
             $table->rememberToken();
             $table->timestamps();

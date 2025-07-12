@@ -21,7 +21,7 @@ class CompanySettingController extends Controller
             'state' => 'required|string',
             'about' => 'required|string',
             'overview' => 'required|string',
-            'images' => 'sometimes|array', // max 3 image
+            'images' => 'sometimes|array',
             'images.*' => 'image|mimes:jpeg,png,jpg,gif,svg|max:2048',
         ]);
 
@@ -36,13 +36,9 @@ class CompanySettingController extends Controller
         $user = User::find(Auth::id());
 
         $paths = [];
-
         if ($request->hasFile('images')) {
-            // ✅ পুরনো images delete করো
             if ($user->photo) {
-                // $oldPhotos = json_decode($user->photo, true);
                 $oldPhotos = is_string($user->photo) ? json_decode($user->photo, true) : $user->photo;
-
                 if (is_array($oldPhotos)) {
                     foreach ($oldPhotos as $oldPhoto) {
                         $filePath = public_path($oldPhoto);
@@ -53,7 +49,7 @@ class CompanySettingController extends Controller
                 }
             }
 
-            // ✅ নতুন images save করো
+            // ✅ new images save
             foreach ($request->file('images') as $image) {
                 $paths[] = '/storage/' . $image->store('images', 'public');
             }
@@ -66,7 +62,7 @@ class CompanySettingController extends Controller
             'state' => $request->state,
             'about' => $request->about,
             'overview' => $request->overview,
-            'photo' => !empty($paths) ? json_encode($paths) : $user->photo, // নতুন ছবি না থাকলে পুরনোটা রাখবে
+            'photo' => !empty($paths) ? json_encode($paths) : $user->photo,
         ]);
 
         return response()->json([
@@ -95,6 +91,22 @@ class CompanySettingController extends Controller
             'service_name' => $request->service_name,
             'starting_price' => $request->starting_price,
         ]);
+
+
+        $user = User::find(Auth::id()); // এখানে $id হলো ইউজারের আইডি
+
+        // Step 1: পুরনো ডেটা decode করো
+        $types = json_decode($user->company_type, true);
+
+        // Step 2: নতুন টাইপ push করো (duplication চেক সহ)
+        if (!in_array($request->service_name, $types)) {
+            $types[] = $request->service_name;
+        }
+
+        // Step 3: আবার encode করে সেভ করো
+        $user->company_type = json_encode($types);
+        $user->save();
+
 
         return response()->json([
             'status' => true,
@@ -157,6 +169,10 @@ class CompanySettingController extends Controller
     public function getProviderCompany(Request $request)
     {
         $provider = User::where('id', Auth::id())->where('role', 'COMPANY')->first();
+
+        $provider->service_list_names = ServiceList::where('user_id', $provider->id)->get();
+
+        $provider->company_type = json_decode($provider->company_type);
 
         return response()->json([
             'status' => true,
