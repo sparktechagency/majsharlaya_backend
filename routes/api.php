@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\ServiceController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Company\CompanyOrderController;
 use App\Http\Controllers\Company\CompanySettingController;
 use App\Http\Controllers\Company\ServiceProviderController;
 use App\Http\Controllers\User\OrderController;
@@ -86,6 +87,9 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/view-provider', [ServiceProviderController::class, 'viewProvider']);
         Route::delete('/delete-provider', [ServiceProviderController::class, 'deleteProvider']);
         Route::get('/filter-providers', [ServiceProviderController::class, 'filterProviders']);
+
+        // order
+        Route::get('/get-approve-posts',[CompanyOrderController::class,'getApprovePosts']);
 
 
     });
