@@ -144,25 +144,33 @@ class ServiceProviderController extends Controller
         ]);
     }
 
-    public function filterProviders(Request $request)
+    public function searchFilterProviders(Request $request)
     {
-        $status = $request->status;
+        $status = $request->input('status');  // "Available", "Not available"
+        $search = $request->input('search');  // "provider name" or "email"
 
         $query = Provider::query();
 
-        if ($status === 'Available') {
-            $query->where('status', 'Available');
-        } elseif ($status === 'Not available') {
-            $query->where('status', 'Not available');
+        // 🔍 Search by name or email
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+                // ->orWhere('number', 'like', "%{$search}%"); // Optional
+            });
         }
 
-        $providers = $query->get();
+        // ✅ Filter by status if provided
+        if ($status === 'Available' || $status === 'Not available') {
+            $query->where('status', $status);
+        }
+
+        // 🔄 Get and transform data
+        $providers = $query->latest()->get();
 
         $providers->transform(function ($provider) {
-
-            $provider->type = json_decode($provider->type, true);
-            $provider->nid = json_decode($provider->nid, true);
-
+            $provider->type = is_string($provider->type) ? json_decode($provider->type, true) : $provider->type;
+            $provider->nid = is_string($provider->nid) ? json_decode($provider->nid, true) : $provider->nid;
             return $provider;
         });
 

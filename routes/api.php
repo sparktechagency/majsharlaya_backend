@@ -9,6 +9,7 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Company\CompanyOrderController;
 use App\Http\Controllers\Company\CompanySettingController;
 use App\Http\Controllers\Company\ServiceProviderController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\User\OrderController;
 use App\Models\ProviderCompany;
 use Illuminate\Http\Request;
@@ -26,11 +27,14 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/logout', [AuthController::class, 'logout']);
     Route::post('/change-password', [AuthController::class, 'changePassword']);
     Route::get('/profile', [AuthController::class, 'profile']);
+
+    // setting admin and provider company
     Route::post('/update-password', [AuthController::class, 'updatePassword']);
+    Route::post('edit-profile', [SettingsController::class, 'editProfile']);
+    Route::post('change-avatar', [SettingsController::class, 'changeAvatar']);
 
     // ADMIN
     Route::middleware('admin')->group(function () {
-
         // users       
         Route::get('/get-users', [UserController::class, 'getUsers']);
         Route::get('/view-user', [UserController::class, 'viewUser']);
@@ -41,8 +45,6 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/view-booking', [BookingController::class, 'viewBooking']);
         Route::delete('/delete-booking', [BookingController::class, 'deleteBooking']);
         Route::put('/approve-booking', [BookingController::class, 'approveBooking']);
-
-
 
         // service
         Route::post('/create-service', [ServiceController::class, 'createService']);
@@ -67,9 +69,11 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/search-filter-provider-companies', [ProviderCompanyController::class, 'searchFilterProviderCompanies']);
 
         // settings
-        Route::post('edit-profile', [SettingsController::class, 'editProfile']);
-        // Route::post('update-password',[SettingsController::class,'updatePassword']);
-        Route::post('change-avatar', [SettingsController::class, 'changeAvatar']);
+        Route::post('privacy-policy', [SettingsController::class, 'privacyPolicy']);
+        Route::post('about-us', [SettingsController::class, 'aboutUs']);
+        Route::post('terms-conditions', [SettingsController::class, 'termsConditions']);
+        Route::get('get-page', [SettingsController::class, 'getPage']);
+
     });
 
     // COMPANY
@@ -86,16 +90,21 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/get-providers', [ServiceProviderController::class, 'getProviders']);
         Route::get('/view-provider', [ServiceProviderController::class, 'viewProvider']);
         Route::delete('/delete-provider', [ServiceProviderController::class, 'deleteProvider']);
-        Route::get('/filter-providers', [ServiceProviderController::class, 'filterProviders']);
+        Route::get('/search-filter-providers', [ServiceProviderController::class, 'searchFilterProviders']);
 
         // order
-        Route::get('/get-approve-posts',[CompanyOrderController::class,'getApprovePosts']);
-
+        Route::get('/get-approve-posts', [CompanyOrderController::class, 'getApprovePosts']);
+        Route::put('/assign-provider', [CompanyOrderController::class, 'assignProvider']);
+        Route::get('/search-assign-providers', [CompanyOrderController::class, 'searchAssignProviders']);
+        Route::post('/send-delivery-request', [CompanyOrderController::class, 'sendDeliveryRequest']);
 
     });
 
     // USER
     Route::middleware('user')->group(function () {
-        Route::post('create-order',[OrderController::class,'createOrder']);
+        Route::post('create-order', [OrderController::class, 'createOrder']);
+
+        // notifications 
+        Route::get('/get-notifications', [NotificationController::class, 'getNotifications']);
     });
 });
