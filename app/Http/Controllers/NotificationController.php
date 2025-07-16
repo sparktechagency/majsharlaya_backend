@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Support\Facades\Validator;
 
 class NotificationController extends Controller
 {
@@ -21,10 +22,12 @@ class NotificationController extends Controller
             ], 401);
         }
 
-        // 🔔 সর্বশেষ ১০টি notification
-        $notifications = $user->notifications()->latest()->take(10)->get();
+        // ✅ Query builder দিয়ে নাও
+        // $notifications = $user->notifications()->latest()->take(10)->get();
+        // $notification_id = $user->notifications->pluck('id');
 
-        // 🎯 ফরম্যাট করে রিটার্ন
+        $notifications = DatabaseNotification::whereIn('id', $user->notifications->pluck('id'))->latest()->take(10)->get();
+
         $formatted = $notifications->transform(function (DatabaseNotification $notification) {
             return [
                 'id' => $notification->id,
@@ -40,6 +43,52 @@ class NotificationController extends Controller
             'status' => true,
             'message' => 'Latest 10 notifications',
             'data' => $formatted
+        ]);
+    }
+
+    public function read(Request $request)
+    {
+        // validation roles
+        $validator = Validator::make($request->all(), [
+            'notification_id' => 'required|string|exists:notifications,id',
+        ]);
+
+        // check validation
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => $validator->errors()
+            ], 422);
+        }
+
+        $notification = DatabaseNotification::find($request->notification_id);
+
+        $notification->markAsRead();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Read'
+        ]);
+    }
+
+    // read all notification
+    public function readAll(Request $request)
+    {
+        $ids = Auth::user()->unreadNotifications->pluck('id')->toArray();
+
+        DatabaseNotification::whereIn('id', $ids)->update(['read_at' => now()]);
+        return response()->json([
+            'status' => true,
+            'message' => 'Read all'
+        ]);
+    }
+
+    //for unread notification count
+    public function unreadCount()
+    {
+        return response()->json([
+            'status' => true,
+            'unread_count' => Auth::user()->unreadNotifications->count(),
         ]);
     }
 }

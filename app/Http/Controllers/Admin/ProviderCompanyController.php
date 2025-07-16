@@ -16,11 +16,11 @@ use Illuminate\Support\Facades\Validator;
 
 class ProviderCompanyController extends Controller
 {
-    public function createProviderCompany(Request $request)
+    public function createCompany(Request $request)
     {
         // Validation Rules
         $validator = Validator::make($request->all(), [
-            'provider_types' => 'required',
+            'company_types' => 'required',
             'city' => 'sometimes|string',
             'state' => 'sometimes|string',
             'email' => 'required|string|email|max:255|unique:users,email',
@@ -36,11 +36,11 @@ class ProviderCompanyController extends Controller
         }
 
         // যদি provider_types stringified JSON হয়:
-        $providerTypes = is_string($request->provider_types)
-            ? json_decode($request->provider_types, true)
-            : $request->provider_types;
+        $companyTypes = is_string($request->company_types)
+            ? json_decode($request->company_types, true)
+            : $request->company_types;
 
-        $provider_company = User::create([
+        $company = User::create([
             'name' => 'Unknown',
             'role' => 'COMPANY',
             'status' => 'active',
@@ -49,24 +49,24 @@ class ProviderCompanyController extends Controller
             'email' => $request->email,
             'email_verified_at' => Carbon::now(),
             'password' => bcrypt($request->password),
-            'company_type' => $request->provider_types
+            'company_type' => $request->company_types
         ]);
 
-        foreach ($providerTypes as $value) {
+        foreach ($companyTypes as $value) {
             ServiceList::create([
-                'user_id' => $provider_company->id,
+                'user_id' => $company->id,
                 'service_name' => $value,
             ]);
         }
 
         return response()->json([
             'status' => true,
-            'message' => 'Provider_company created successful',
-            'data' => $provider_company
+            'message' => 'Company created successful',
+            'data' => $company
         ], 201);
     }
 
-    public function getProviderCompanies(Request $request)
+    public function getCompanies(Request $request)
     {
         $search = $request->input('search'); // ?search=dhaka, etc
 
@@ -74,8 +74,8 @@ class ProviderCompanyController extends Controller
 
         if ($search) {
             $usersQuery->where(function ($query) use ($search) {
-                $query->where('name', 'like', "%$search%");
-                // ->orWhere('email', 'like', "%$search%")
+                $query->where('name', 'like', "%$search%")
+                ->orWhere('email', 'like', "%$search%");
                 // ->orWhere('city', 'like', "%$search%")
                 // ->orWhere('state', 'like', "%$search%");
             });
@@ -90,20 +90,20 @@ class ProviderCompanyController extends Controller
             $user->plus_counts = $user->service_list_names->count() - 1;
 
             // ✅ avg rating and total count from reviews
-            $user->avgRating = round(Review::where('provider_company_id', $user->id)->avg('rating'), 1);
-            $user->totalReviews = Review::where('provider_company_id', $user->id)->count();
+            $user->avgRating = round(Review::where('company_id', $user->id)->avg('rating'), 1);
+            $user->totalReviews = Review::where('company_id', $user->id)->count();
 
             return $user;
         });
 
         return response()->json([
             'status' => true,
-            'message' => $search ? "Searching by company name" : "Get all provider companies",
+            'message' => $search ? "Searching by company name" : "Get all companies",
             'data' => $users
         ], 200);
     }
 
-    public function filterProviderCompanies(Request $request)
+    public function filterCompanies(Request $request)
     {
         $inputType = $request->input('type'); // example: 'plamber'
 
@@ -132,9 +132,9 @@ class ProviderCompanyController extends Controller
         ]);
     }
 
-    public function deleteProviderCompany(Request $request)
+    public function deleteCompany(Request $request)
     {
-        $company = User::where('id', $request->provider_company_id)->where('role', 'COMPANY')->first();
+        $company = User::where('id', $request->company_id)->where('role', 'COMPANY')->first();
 
         if (!$company) {
             return response()->json([
@@ -151,15 +151,15 @@ class ProviderCompanyController extends Controller
         ], 200);
     }
 
-    public function changePasswordProviderCompany(Request $request)
+    public function changePasswordCompany(Request $request)
     {
         $request->validate([
-            'provider_company_id' => 'required|exists:users,id',
+            'company_id' => 'required|exists:users,id',
             'current_password' => 'required|string',
             'new_password' => 'required|string|min:6|confirmed', // new_password_confirmation লাগবে
         ]);
 
-        $user = User::where('id', $request->provider_company_id)
+        $user = User::where('id', $request->company_id)
             ->where('role', 'COMPANY')
             ->first();
 
@@ -186,13 +186,13 @@ class ProviderCompanyController extends Controller
         ]);
     }
 
-    public function viewProviderCompany(Request $request)
+    public function viewCompany(Request $request)
     {
         $request->validate([
-            'provider_company_id' => 'required|numeric',
+            'company_id' => 'required|numeric',
         ]);
 
-        $user = User::where('id', $request->provider_company_id)
+        $user = User::where('id', $request->company_id)
             ->where('role', 'COMPANY')
             ->first();
 
@@ -212,8 +212,8 @@ class ProviderCompanyController extends Controller
         $user->service_list_names = ServiceList::where('user_id', $user->id)->pluck('service_name');
 
         // avg rating and total count form reviews
-        $user->avgRating = Review::where('provider_company_id', $user->id)->avg('rating');
-        $user->totalReviews = Review::where('provider_company_id', $user->id)->count();
+        $user->avgRating = Review::where('company_id', $user->id)->avg('rating');
+        $user->totalReviews = Review::where('company_id', $user->id)->count();
 
         return response()->json([
             'status' => true,
@@ -222,7 +222,7 @@ class ProviderCompanyController extends Controller
         ]);
     }
 
-    public function searchFilterProviderCompanies(Request $request)
+    public function searchFilterCompanies(Request $request)
     {
         $search = $request->input('search');    // for name search
         $type = $request->input('type');        // for filtering company_type
@@ -233,9 +233,9 @@ class ProviderCompanyController extends Controller
         if ($search) {
             $usersQuery->where(function ($query) use ($search) {
                 $query->where('name', 'like', "%$search%")
-                    ->orWhere('email', 'like', "%$search%")
-                    ->orWhere('city', 'like', "%$search%")
-                    ->orWhere('state', 'like', "%$search%");
+                    ->orWhere('email', 'like', "%$search%");
+                    // ->orWhere('city', 'like', "%$search%")
+                    // ->orWhere('state', 'like', "%$search%");
             });
         }
 
@@ -254,8 +254,8 @@ class ProviderCompanyController extends Controller
             unset($user->types);
             $user->service_list_names = ServiceList::where('user_id', $user->id)->pluck('service_name');
             $user->plus_counts = $user->service_list_names->count() - 1;
-            $user->avgRating = round(Review::where('provider_company_id', $user->id)->avg('rating'), 1);
-            $user->totalReviews = Review::where('provider_company_id', $user->id)->count();
+            $user->avgRating = round(Review::where('company_id', $user->id)->avg('rating'), 1);
+            $user->totalReviews = Review::where('company_id', $user->id)->count();
             return $user;
         });
 

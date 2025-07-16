@@ -1,26 +1,22 @@
 <?php
 
-namespace App\Http\Controllers\Admin;
+namespace App\Http\Controllers\Company;
 
 use App\Http\Controllers\Controller;
-use App\Models\Page;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
-
-use function Pest\Laravel\json;
 
 class SettingsController extends Controller
 {
-    public function editProfile(Request $request)
+    public function editCompanyProfile(Request $request)
     {
-        $user = User::where('id', Auth::id())->where('role', 'ADMIN')->first();
+        $user = User::where('id', Auth::id())->where('role', 'COMPANY')->first();
 
         // Validation Rules
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string',
+            'company_name' => 'required|string',
             'email' => 'required|email',
         ]);
 
@@ -32,20 +28,20 @@ class SettingsController extends Controller
             ], 422);
         }
 
-        $user->name = $request->name;
+        $user->name = $request->company_name;
         $user->email = $request->email;
         $user->save();
 
         return response()->json([
             'status' => true,
-            'message' => 'Profile update successful',
+            'message' => 'Company profile update successful',
             'data' => $user
         ], 201);
     }
 
-    public function changeAvatar(Request $request)
+    public function changeCompanyAvatar(Request $request)
     {
-        $user = User::where('id', Auth::id())->where('role', 'ADMIN')->first();
+        $user = User::where('id', Auth::id())->where('role', 'COMPANY')->first();
 
         $validator = Validator::make($request->all(), [
             'avatar' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048', // 2MB max
@@ -72,7 +68,7 @@ class SettingsController extends Controller
 
             return response()->json([
                 'status' => true,
-                'message' => 'Avatar updated successfully!',
+                'message' => 'Company avatar updated successfully!',
                 'path' => $user->avatar,
             ]);
         }
@@ -82,33 +78,4 @@ class SettingsController extends Controller
             'message' => 'No image uploaded!',
         ], 400);
     }
-
-    public function createPage(Request $request)
-    {
-        return $this->storeOrUpdatePage($request, $request->page_type, $request->content);
-    }
-
-    private function storeOrUpdatePage(Request $request, $page_type, $content)
-    {
-        // Validation (only content)
-        $request->validate([
-            'content' => 'required|string',
-        ]);
-
-        // Update or Create based on 'type'
-        $page = Page::updateOrCreate(
-            ['page_type' => $page_type], // condition
-            ['content' => json_encode($request->content)]
-        );
-
-        return response()->json([
-            'status' => true,
-            'message' => $page_type . ' page saved successfully.',
-            'data' => [
-                'page_type' => $page_type,
-                'content' => $page->content,
-            ],
-        ]);
-    }
-
 }

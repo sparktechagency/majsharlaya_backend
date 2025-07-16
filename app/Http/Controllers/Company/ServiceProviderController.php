@@ -15,7 +15,7 @@ class ServiceProviderController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'name' => 'required|string',
-            'email' => 'required|email',
+            'email' => 'required|email|unique:providers,email',
             'type' => 'required|string',
             'number' => 'nullable|string',
             'nid' => 'nullable|array', // image multiple হলে array
